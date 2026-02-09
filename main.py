@@ -10,10 +10,10 @@ from datetime import datetime
 import pygame
 import subprocess
 from dotenv import load_dotenv
-import pywhatkit
-import winsound
+import spotipy
+from spotipy.oauth2 import SpotifyOAuth
 
-# --- 1. SETUP AUDIO & ENV ---
+# 1. SETUP AUDIO & ENV 
 try:
     pygame.mixer.init()
 except pygame.error:
@@ -22,6 +22,9 @@ except pygame.error:
 load_dotenv()
 
 API_KEY = os.getenv("GROQ_API_KEY")
+SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
+SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
+SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI", "http://localhost:8888/callback")
 
 if not API_KEY or "gsk_" not in API_KEY:
     print("❌ ERROR: API Key tidak valid. Cek file .env kamu!")
@@ -29,8 +32,24 @@ if not API_KEY or "gsk_" not in API_KEY:
 
 client = Groq(api_key=API_KEY)
 
-# --- 2. CONFIGURATION ---
+# Setup Spotify (optional - jika credentials tersedia)
+spotify_client = None
+if SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET:
+    try:
+        sp_oauth = SpotifyOAuth(
+            client_id=SPOTIFY_CLIENT_ID,
+            client_secret=SPOTIFY_CLIENT_SECRET,
+            redirect_uri=SPOTIFY_REDIRECT_URI,
+            scope="user-modify-playback-state user-read-playback-state user-read-currently-playing"
+        )
+        spotify_client = spotipy.Spotify(auth_manager=sp_oauth)
+        print("✅ Spotify API Connected!")
+    except Exception as e:
+        print(f"⚠️ Spotify API not configured: {e}")
+else:
+    print("⚠️ Spotify credentials not found - using URI fallback")
 
+# 2. CONFIGURATION 
 SYSTEM_PROMPT = """
 You are ConvBot. Current time: {time}
 Your Goal: Identify intention (OPEN apps, SEARCH content, CONTROL system, CHAT).
@@ -49,14 +68,12 @@ Rules:
 - REPLY: Short conversational Indonesian.
 """
 
-# [FIX] Hapus kata 'video', 'watching', 'by' karena itu kata umum
 HALLUCINATION_FILTER = [
     "terima kasih", "thank you", "subtitle", "copyright", 
     "amara.org", "subtitles", "caption"
 ]
 
-# --- 3. FUNCTIONS ---
-
+# 3. FUNCTIONS
 async def speak(text):
     """Mouth: EdgeTTS + Pygame"""
     print(f"🗣️  ConvBot: {text}")
@@ -89,7 +106,13 @@ def listen_mic():
     r = sr.Recognizer()
     with sr.Microphone() as source:
         print("\n🔔 [TING] Silakan ngomong...")
-        winsound.Beep(1000, 200) # Nada Tinggi (Start)
+        # Beep hanya untuk Windows
+        if os.name == 'nt':
+            try:
+                import winsound
+                winsound.Beep(1000, 200)
+            except:
+                pass
         
         r.dynamic_energy_threshold = True
         r.energy_threshold = 2000 
@@ -99,7 +122,12 @@ def listen_mic():
             audio = r.listen(source, timeout=None)
             
             print("🔒 [TUNG] Memproses...")
-            winsound.Beep(700, 200) # Nada Rendah (Stop)
+            if os.name == 'nt':
+                try:
+                    import winsound
+                    winsound.Beep(700, 200)
+                except:
+                    pass
 
             with open("temp_input.wav", "wb") as f:
                 f.write(audio.get_wav_data())
@@ -113,7 +141,7 @@ def listen_mic():
             
             text_result = transcription.text.strip()
             
-            # --- FILTER HALUSINASI ---
+            # FILTER HALUSINASI 
             if not text_result: return None
             if len(text_result) < 3: return None
 
@@ -157,10 +185,52 @@ def control_system(command):
     except Exception as e:
         print(f"Error Sys: {e}")
 
-# --- 4. MAIN LOOP ---
+def play_spotify(song_name):
+    """Spotify Auto-Play dengan API atau fallback ke URI"""
+    if spotify_client:
+        try:
+            # Search lagu
+            results = spotify_client.search(q=song_name, limit=1, type='track')
+            
+            if results['tracks']['items']:
+                track = results['tracks']['items'][0]
+                track_uri = track['uri']
+                track_name = track['name']
+                artist_name = track['artists'][0]['name']
+                
+                print(f"🎵 Playing: {track_name} by {artist_name}")
+                
+                # Coba putar di active device
+                try:
+                    spotify_client.start_playback(uris=[track_uri])
+                    return f"Memutar {track_name} oleh {artist_name}"
+                except Exception as e:
+                    # Jika tidak ada active device, buka di browser
+                    print(f"⚠️ No active device, opening in browser: {e}")
+                    webbrowser.open(track['external_urls']['spotify'])
+                    return f"Membuka {track_name} di Spotify"
+            else:
+                return "Lagu tidak ditemukan"
+                
+        except Exception as e:
+            print(f"Error Spotify API: {e}")
+            # Fallback ke URI scheme
+            if os.name == 'nt':
+                os.system(f'start spotify:search:"{song_name}"')
+            else:
+                os.system(f'open "spotify:search:{song_name}"')
+            return f"Mencari {song_name} di Spotify"
+    else:
+        # Fallback jika tidak ada API
+        if os.name == 'nt':
+            os.system(f'start spotify:search:"{song_name}"')
+        else:
+            os.system(f'open "spotify:search:{song_name}"')
+        return f"Mencari {song_name} di Spotify"
 
+# 4. MAIN LOOP
 async def main():
-    print("🔥 JARVIS REBORN - READY")
+    print("🤖 ConvBot - READY")
     print("Tunggu bunyi 'TING' baru ngomong.")
     print("Tip: Bilang 'Stop' atau 'Cukup' untuk mematikan.")
     
@@ -191,8 +261,9 @@ async def main():
 
                 if category == "playback":
                     if "youtube" in target:
-                        print(f"🎬 Auto-Playing YouTube: {content}")
-                        pywhatkit.playonyt(content)
+                        print(f"🎬 Opening YouTube: {content}")
+                        query = content.replace(" ", "+")
+                        webbrowser.open(f"https://www.youtube.com/results?search_query={query}")
                     
                     elif "spotify" in target:
                         print(f"🎵 Opening Spotify: {content}")

@@ -49,6 +49,31 @@ A voice-controlled conversational AI assistant that can open apps, search the we
    
    Get your API key from [Groq Console](https://console.groq.com)
 
+6. **[Optional] Setup Spotify Auto-Play**
+   For automatic song playback (requires Spotify Premium):
+   
+   a. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
+   
+   b. Create a new app:
+      - App name: `ConvBot`
+      - App description: `Voice-controlled Spotify bot`
+      - Redirect URI: `http://localhost:8888/callback`
+   
+   c. Get your credentials from Settings:
+      - Client ID
+      - Client Secret (click "View client secret")
+   
+   d. Add to your `.env` file:
+      ```
+      SPOTIFY_CLIENT_ID=your_client_id_here
+      SPOTIFY_CLIENT_SECRET=your_client_secret_here
+      SPOTIFY_REDIRECT_URI=http://localhost:8888/callback
+      ```
+   
+   e. First run will open browser for authentication - login and authorize the app
+   
+   **Note:** Without Spotify API setup, bot will use basic search (no auto-play)
+
 ## Usage
 
 Run the bot:
@@ -57,6 +82,7 @@ python main.py
 ```
 
 Then speak your commands! Examples:
+- "Play Perfect by Ed Sheeran" (auto-play with API, search without)
 - "Open Spotify"
 - "Search Python tutorials"
 - "Turn off WiFi"
@@ -69,15 +95,18 @@ Then speak your commands! Examples:
 - Groq API key
 - Microphone for voice input
 - Audio output device
+- **[Optional]** Spotify Premium account (for auto-play feature)
 
 ## Dependencies
 
 - `groq` - Groq API client
-- `speech-recognition` - Voice input
+- `SpeechRecognition` - Voice input
 - `AppOpener` - Open applications
 - `edge-tts` - Text-to-speech
 - `pygame` - Audio playback
 - `python-dotenv` - Environment variable management
+- `spotipy` - Spotify API integration
+- `PyAudio` - Microphone audio capture
 
 ## License
 

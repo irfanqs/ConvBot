@@ -1,6 +1,8 @@
 groq
-speech-recognition
+SpeechRecognition
 AppOpener
 edge-tts
 pygame
 python-dotenv
+PyAudio
+spotipy
