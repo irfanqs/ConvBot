@@ -32,9 +32,94 @@ if not API_KEY or "gsk_" not in API_KEY:
 
 client = Groq(api_key=API_KEY)
 
-# Setup Spotify (optional - jika credentials tersedia)
+# User Config File
+CONFIG_FILE = ".user_config.json"
+
+def load_user_config():
+    """Load user preferences"""
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, 'r') as f:
+            return json.load(f)
+    return None
+
+def save_user_config(config):
+    """Save user preferences"""
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(config, f, indent=2)
+
+def spotify_setup_wizard():
+    """Interactive Spotify setup wizard"""
+    print("\n" + "="*60)
+    print("🎵 SPOTIFY SETUP WIZARD")
+    print("="*60)
+    
+    print("\n❓ Apakah kamu punya akun Spotify Premium?")
+    print("   (Diperlukan untuk fitur auto-play)")
+    print("\n   Pilih:")
+    print("   1. Ya, saya punya Premium (Auto-play enabled)")
+    print("   2. Tidak, saya pakai Free (Search only)")
+    print("   3. Skip setup (Tanya lagi nanti)")
+    
+    while True:
+        choice = input("\n👉 Pilihan (1/2/3): ").strip()
+        
+        if choice == "1":
+            print("\n✨ Great! Kamu akan mendapatkan fitur auto-play!")
+            print("\n📋 Langkah setup:")
+            print("   1. Buka: https://developer.spotify.com/dashboard")
+            print("   2. Create app dengan Redirect URI: http://localhost:8888/callback")
+            print("   3. Copy Client ID & Client Secret")
+            print("   4. Tambahkan ke file .env:")
+            print("      SPOTIFY_CLIENT_ID=your_client_id")
+            print("      SPOTIFY_CLIENT_SECRET=your_client_secret")
+            print("\n📖 Panduan lengkap ada di file: SPOTIFY_SETUP.md")
+            
+            config = {
+                "spotify_premium": True,
+                "setup_completed": True,
+                "setup_date": datetime.now().isoformat()
+            }
+            save_user_config(config)
+            
+            print("\n✅ Preferensi disimpan! Restart bot setelah setup .env")
+            return config
+            
+        elif choice == "2":
+            print("\n✅ Oke! Mode search-only akan digunakan.")
+            print("   Kamu tetap bisa search lagu, tapi harus klik play manual.")
+            
+            config = {
+                "spotify_premium": False,
+                "setup_completed": True,
+                "setup_date": datetime.now().isoformat()
+            }
+            save_user_config(config)
+            
+            print("\n💡 Tip: Upgrade ke Premium nanti? Hapus file .user_config.json")
+            return config
+            
+        elif choice == "3":
+            print("\n⏭️  Setup di-skip. Bot akan tanya lagi next time.")
+            config = {
+                "spotify_premium": False,
+                "setup_completed": False
+            }
+            save_user_config(config)
+            return config
+            
+        else:
+            print("❌ Pilihan tidak valid. Ketik 1, 2, atau 3")
+
+# Setup Spotify based on user config
 spotify_client = None
-if SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET:
+user_config = load_user_config()
+
+if user_config is None:
+    # First run - setup wizard
+    user_config = spotify_setup_wizard()
+
+# Initialize Spotify API if premium and credentials available
+if user_config.get("spotify_premium") and SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET:
     try:
         sp_oauth = SpotifyOAuth(
             client_id=SPOTIFY_CLIENT_ID,
@@ -43,11 +128,16 @@ if SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET:
             scope="user-modify-playback-state user-read-playback-state user-read-currently-playing"
         )
         spotify_client = spotipy.Spotify(auth_manager=sp_oauth)
-        print("✅ Spotify API Connected!")
+        print("✅ Spotify API Connected - Auto-play ENABLED!")
     except Exception as e:
-        print(f"⚠️ Spotify API not configured: {e}")
+        print(f"⚠️ Spotify API error: {e}")
+        print("💡 Fallback ke mode search-only")
+elif user_config.get("spotify_premium") and not (SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET):
+    print("⚠️ Premium account detected tapi credentials belum di-setup!")
+    print("📖 Lihat panduan: SPOTIFY_SETUP.md")
+    print("💡 Menggunakan mode search-only untuk sekarang")
 else:
-    print("⚠️ Spotify credentials not found - using URI fallback")
+    print("✅ Spotify mode: Search-only")
 
 # 2. CONFIGURATION 
 SYSTEM_PROMPT = """

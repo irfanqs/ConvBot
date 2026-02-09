@@ -76,18 +76,38 @@ A voice-controlled conversational AI assistant that can open apps, search the we
 
 ## Usage
 
-Run the bot:
+### First Run - Setup Wizard
+
+When you run the bot for the first time, you'll see an interactive setup:
+
 ```bash
 python main.py
 ```
 
-Then speak your commands! Examples:
-- "Play Perfect by Ed Sheeran" (auto-play with API, search without)
-- "Open Spotify"
-- "Search Python tutorials"
-- "Turn off WiFi"
-- "Play Levitating on Spotify"
-- "Chat: How are you today?"
+The bot will ask:
+```
+🎵 SPOTIFY SETUP WIZARD
+❓ Apakah kamu punya akun Spotify Premium?
+   1. Ya, saya punya Premium (Auto-play enabled)
+   2. Tidak, saya pakai Free (Search only)
+   3. Skip setup (Tanya lagi nanti)
+```
+
+**Choose based on your account:**
+- **Option 1** - If you have Spotify Premium → Follow setup guide to enable auto-play
+- **Option 2** - If you use Spotify Free → Bot will use search-only mode
+- **Option 3** - Skip for now → Bot will ask again next time
+
+Your preference is saved in `.user_config.json` and can be changed anytime by deleting the file.
+
+### Voice Commands
+
+After setup, speak your commands! Examples:
+- **"Play Perfect by Ed Sheeran"** - Auto-play (Premium) or search (Free)
+- **"Open Spotify"** - Launch Spotify app
+- **"Search Python tutorials"** - Web search
+- **"Turn off WiFi"** - System control
+- **"Chat: How are you today?"** - Casual conversation
 
 ## Requirements
 
